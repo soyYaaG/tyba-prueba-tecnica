@@ -1,0 +1,12 @@
+[project]
+authors = [
+    { name = "Yerson Alexander Arredondo García", email = "yerson-302@hotmail.com" },
+]
+name = "tyba-prueba-tecnica"
+version = "0.1.0"
+description = "Solución para la prueba técnica de Tyba."
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "duckdb>=1.5.6",
+]
