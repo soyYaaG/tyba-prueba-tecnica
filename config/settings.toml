@@ -1,0 +1,14 @@
+
+[database]
+path = "data/output/tyba.duckdb"
+
+[migrations]
+directory = "migrations"
+
+[data]
+raw_directory = "data/raw"
+output_directory = "data/output"
+
+[pipeline]
+reject_null_ids = true
+track_deletions = true
