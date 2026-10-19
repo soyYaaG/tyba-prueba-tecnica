@@ -7,7 +7,12 @@ version = "0.1.0"
 description = "Solución para la prueba técnica de Tyba."
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = ["duckdb>=1.5.6", "numpy>=2.5.4", "pandas>=3.0.6"]
+dependencies = [
+    "duckdb>=1.5.6",
+    "numpy>=2.5.4",
+    "pandas>=3.0.6",
+    "pydantic>=2.14.1",
+]
 
 [tool.ruff.format]
 quote-style = "single"
