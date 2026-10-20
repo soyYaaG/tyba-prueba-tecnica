@@ -19,9 +19,13 @@ class DataConfig(BaseModel):
     output_directory: Path
 
 
+class SnapshotConfig(BaseModel):
+    batch: str
+    file: str
+
+
 class PipelineConfig(BaseModel):
-    reject_null_ids: bool = True
-    track_deletions: bool = False
+    snapshots: list[SnapshotConfig]
 
 
 class AppConfig(BaseModel):

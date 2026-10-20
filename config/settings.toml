@@ -10,5 +10,7 @@ raw_directory = "data/raw"
 output_directory = "data/output"
 
 [pipeline]
-reject_null_ids = true
-track_deletions = true
+snapshots = [
+    { batch = "T", file = "movimientos_dia_T.parquet" },
+    { batch = "T1", file = "movimientos_dia_T1.parquet" },
+]
