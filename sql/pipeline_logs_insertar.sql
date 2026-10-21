@@ -1,31 +1,91 @@
 INSERT INTO pipeline_logs
 (
+    run_id,
     business_key,
-    accion
+    accion,
+    row_id_t,
+    row_id_t1
 )
-SELECT
-    COALESCE(s.business_key, t.business_key) AS business_key,
-    CASE
-        WHEN t.business_key IS NULL THEN 'INSERTAR'
-        WHEN s.business_key IS NULL THEN 'ELIMINAR'
-        WHEN
-            t.row_hash IS DISTINCT FROM s.row_hash
-            OR t.id_cliente IS DISTINCT FROM s.id_cliente
-            OR t.date IS DISTINCT FROM s.date
-            OR t.raw_date IS DISTINCT FROM s.raw_date
-            OR t.product IS DISTINCT FROM s.product
-            OR t.type IS DISTINCT FROM s.type
-            OR t.raw_type IS DISTINCT FROM s.raw_type
-            OR t.fund IS DISTINCT FROM s.fund
-            OR t.amount IS DISTINCT FROM s.amount
-            OR t.description IS DISTINCT FROM s.description
-            OR t.commercial_name IS DISTINCT FROM s.commercial_name
-        THEN 'ACTUALIZAR'
-        ELSE 'OMITIR'
-    END AS accion
-FROM
-    movimientos_dia_t1 AS s
-FULL OUTER JOIN
-    movimientos_dia_t AS t
-ON
-    t.business_key = s.business_key;
+WITH ambiguas AS (
+    SELECT
+        business_key
+    FROM
+        movimientos_dia_t
+    WHERE
+        business_key IS NOT NULL
+    GROUP BY
+        business_key
+    HAVING
+        COUNT(*) > 1
+    UNION
+    SELECT
+        business_key
+    FROM
+        movimientos_dia_t1
+    WHERE
+        business_key IS NOT NULL
+    GROUP BY
+        business_key
+    HAVING
+        COUNT(*) > 1
+),
+comparables_t AS (
+    SELECT
+        *
+    FROM
+        movimientos_dia_t
+    WHERE
+        business_key IS NOT NULL
+        AND business_key NOT IN (SELECT business_key FROM ambiguas)
+),
+comparables_t1 AS (
+    SELECT
+        *
+    FROM
+        movimientos_dia_t1
+    WHERE
+        business_key IS NOT NULL
+        AND business_key NOT IN (SELECT business_key FROM ambiguas)
+),
+acciones AS (
+    SELECT
+        COALESCE(t.business_key, s.business_key) AS business_key,
+        CASE
+            WHEN t.row_id IS NULL THEN 'INSERTAR'
+            WHEN s.row_id IS NULL THEN 'ELIMINAR'
+            WHEN t.row_hash IS DISTINCT FROM s.row_hash THEN 'ACTUALIZAR'
+            ELSE 'OMITIR'
+        END AS accion,
+        t.row_id AS row_id_t,
+        s.row_id AS row_id_t1
+    FROM comparables_t AS t
+    FULL OUTER JOIN comparables_t1 AS s USING (business_key)
+    UNION ALL
+    SELECT
+        business_key,
+        CASE
+            WHEN business_key IS NULL THEN 'SIN_LLAVE'
+            ELSE 'AMBIGUO'
+        END,
+        row_id,
+        NULL
+    FROM
+        movimientos_dia_t
+    WHERE
+        business_key IS NULL OR business_key IN (SELECT business_key FROM ambiguas)
+    UNION ALL
+    SELECT
+        business_key,
+        CASE
+            WHEN business_key IS NULL THEN 'SIN_LLAVE'
+            ELSE 'AMBIGUO'
+        END,
+        NULL,
+        row_id
+    FROM
+        movimientos_dia_t1
+    WHERE
+        business_key IS NULL OR business_key IN (SELECT business_key FROM ambiguas)
+)
+SELECT ?, business_key, accion, row_id_t, row_id_t1
+FROM acciones;
