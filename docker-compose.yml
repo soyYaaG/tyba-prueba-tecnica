@@ -1,0 +1,11 @@
+services:
+  pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tyba-prueba-tecnica:local
+    working_dir: /app
+    volumes:
+      - ./data:/app/data
+    command: ["uv", "run", "python", "main.py"]
+    restart: "no"
