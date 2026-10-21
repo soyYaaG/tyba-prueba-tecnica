@@ -9,7 +9,7 @@ _SQL_FILES = {
     'migracion_seleccionar_huella_sha256': 'migracion_seleccionar_huella_sha256.sql',
     'movimientos_insertar': 'movimientos_insertar.sql',
     'movimiento_merge': 'movimiento_merge.sql',
-    'movimiento_pipeline_logs_insertar': 'movimiento_pipeline_logs_insertar.sql',
+    'pipeline_logs_insertar': 'pipeline_logs_insertar.sql',
 }
 
 
