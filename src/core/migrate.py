@@ -2,26 +2,21 @@ import hashlib
 import re
 from datetime import UTC, datetime
 
+from sql import get_sql
+
 from .config import config
 from .database import get_connection
 
 
 def run_migrations():
     directory = config.migrations.directory
+    sql_directory = config.data.sql_directory
     con = get_connection()
 
     try:
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS schema_migrations
-            (
-                version VARCHAR PRIMARY KEY,
-                filename VARCHAR NOT NULL,
-                checksum VARCHAR NOT NULL,
-                applied_at TIMESTAMP NOT NULL
-            )
-        """)
+        con.execute(get_sql(sql_directory, 'migracion_crear_tabla'))
 
-        files = sorted(directory.glob('V*.sql'))
+        files = sorted(directory.glob('v*.sql'))
         pattern = re.compile(r'^v(\d+)_\w+\.sql$')
 
         versions = set()
@@ -49,14 +44,7 @@ def run_migrations():
             checksum = hashlib.sha256(sql_bytes).hexdigest()
 
             existing = con.execute(
-                """
-                SELECT
-                    checksum
-                FROM
-                    schema_migrations
-                WHERE
-                    version = ?
-                """,
+                get_sql(sql_directory, 'migracion_seleccionar_huella_sha256'),
                 [str(version)],
             ).fetchone()
 
@@ -72,12 +60,7 @@ def run_migrations():
             try:
                 con.execute(sql)
                 con.execute(
-                    """
-                    INSERT INTO schema_migrations
-                        (version, filename, checksum, applied_at)
-                    VALUES
-                        (?, ?, ?, ?)
-                    """,
+                    get_sql(sql_directory, 'migracion_insertar'),
                     [
                         str(version),
                         file.name,
