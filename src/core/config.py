@@ -26,6 +26,7 @@ class SnapshotConfig(BaseModel):
 
 class PipelineConfig(BaseModel):
     snapshots: list[SnapshotConfig]
+    fail_on_empty: bool = True
 
 
 class AppConfig(BaseModel):

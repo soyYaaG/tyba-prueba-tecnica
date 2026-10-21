@@ -14,3 +14,4 @@ snapshots = [
     { batch = "T", file = "movimientos_dia_T.parquet" },
     { batch = "T1", file = "movimientos_dia_T1.parquet" },
 ]
+fail_on_empty = true
