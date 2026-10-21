@@ -17,6 +17,7 @@ class MigrationsConfig(BaseModel):
 class DataConfig(BaseModel):
     raw_directory: Path
     output_directory: Path
+    sql_directory: Path
 
 
 class SnapshotConfig(BaseModel):

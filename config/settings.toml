@@ -8,6 +8,7 @@ directory = "migrations"
 [data]
 raw_directory = "data/raw"
 output_directory = "data/output"
+sql_directory = "sql"
 
 [pipeline]
 snapshots = [
