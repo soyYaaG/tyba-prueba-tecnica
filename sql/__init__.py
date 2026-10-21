@@ -10,6 +10,8 @@ _SQL_FILES = {
     'movimientos_insertar': 'movimientos_insertar.sql',
     'movimiento_merge': 'movimiento_merge.sql',
     'pipeline_logs_insertar': 'pipeline_logs_insertar.sql',
+    'idempotencia_insertar': 'idempotencia_insertar.sql',
+    'idempotencia_verificar': 'idempotencia_verificar.sql',
 }
 
 

@@ -8,9 +8,7 @@ from .core import config
 def process(con: DuckDBPyConnection):
     con.execute('BEGIN TRANSACTION')
     try:
-        con.execute(
-            get_sql(config.data.sql_directory, 'pipeline_logs_insertar')
-        )
+        con.execute(get_sql(config.data.sql_directory, 'pipeline_logs_insertar'))
         con.execute(get_sql(config.data.sql_directory, 'movimiento_merge'))
     except Exception as e:
         con.execute('ROLLBACK')
