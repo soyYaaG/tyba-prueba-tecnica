@@ -1,65 +1,44 @@
 # Prueba técnica Tyba
 
-Pipeline de datos que carga dos archivos Parquet de movimientos (`T` y `T1`), normaliza sus campos y compara ambos conjuntos para identificar inserciones, actualizaciones, eliminaciones y movimientos sin cambios. El resultado se almacena en una base de datos DuckDB local.
+Esta solución compara dos cortes de movimientos financieros, normaliza los datos y mantiene una base DuckDB con el estado del segundo corte. También registra los cambios identificados y genera reportes para revisar la calidad y el comportamiento de los datos.
 
-## Tecnologías
+El análisis de los archivos entregados está en [INSIGHTS.md](INSIGHTS.md). Allí se presentan los principales hallazgos, sus implicaciones y las recomendaciones para una operación diaria.
 
-- **Python 3.14:** orquestación del pipeline.
-- **uv:** gestión del entorno y de las dependencias, con versiones registradas en `uv.lock`.
-- **DuckDB:** lectura de archivos Parquet, transformaciones SQL y almacenamiento de resultados.
-- **TOML y `tomllib`:** configuración mediante la biblioteca estándar de Python.
-- **Pydantic:** validación de la estructura de configuración.
-- **Docker y Docker Compose:** ejecución en un contenedor.
+## 1. Ejecución rápida con Docker
 
-## Estructura del proyecto
-
-```text
-.
-├── main.py                  # Punto de entrada del pipeline
-├── config/
-│   └── settings.toml        # Rutas y archivos de entrada
-├── data/
-│   ├── raw/                 # Archivos Parquet originales
-│   └── output/              # Base de datos generada al ejecutar
-├── migrations/              # Migraciones SQL versionadas
-├── sql/                     # Consultas de carga, comparación y consolidación
-├── src/
-│   ├── pipeline.py          # Orquestación de migraciones, carga y consolidación
-│   ├── ingestion.py         # Carga de archivos y control de idempotencia
-│   ├── consolidation.py     # Ejecución transaccional del registro y consolidación
-│   └── core/
-│       ├── config.py        # Lectura y validación de settings.toml
-│       ├── database.py      # Conexión a DuckDB
-│       ├── migrate.py       # Aplicación y verificación de migraciones
-│       └── __main__.py      # Punto de entrada para ejecutar solo migraciones
-├── Dockerfile
-├── docker-compose.yml
-├── pyproject.toml           # Dependencias y configuración de herramientas
-├── uv.lock                  # Versiones resueltas de dependencias
-└── README.md
-```
-
-## Archivos de entrada
-
-Los archivos deben estar en `data/raw/` con estos nombres:
+Necesitas Docker con Docker Compose y el motor en ejecución. Los archivos de entrada deben estar en estas rutas:
 
 ```text
 data/raw/movimientos_dia_T.parquet
 data/raw/movimientos_dia_T1.parquet
 ```
 
-La consulta de carga espera las columnas `id_cliente`, `date`, `product`, `type`, `fund`, `amount`, `description` y `commercial_name`.
+Desde la raíz del repositorio, ejecuta:
 
-## Ejecución local con uv
+```bash
+docker compose up --build
+```
 
-Requisitos: Python 3.14 y `uv` disponibles en el equipo. Ejecuta los comandos desde la raíz del repositorio:
+El comando construye la imagen y ejecuta el proceso completo. Al terminar, encontrarás en `data/output/`:
+
+- `tyba.duckdb`: base de datos con los movimientos y el registro de cambios.
+- `insights.md`: reporte con las métricas de los cortes procesados.
+- `analytics_*.csv`: resultados agregados para consultar o analizar en otras herramientas.
+
+La carpeta `data/` se comparte con el contenedor, por lo que los resultados permanecen en tu equipo cuando este termina. Si cambias el código, la configuración o las consultas, vuelve a ejecutar el comando con `--build`.
+
+También puedes construir la imagen con `docker compose build` y ejecutar `docker compose run --rm pipeline`. Esta alternativa elimina el contenedor al finalizar y conserva los resultados en la carpeta compartida.
+
+## 2. Ejecución local
+
+Necesitas Python 3.14 y `uv`. Desde la raíz del repositorio:
 
 ```bash
 uv sync --frozen
 uv run --frozen python main.py
 ```
 
-El primer comando prepara el entorno `.venv` e instala las dependencias del archivo de bloqueo. El segundo ejecuta el pipeline completo y crea `data/output/tyba.duckdb`. No es necesario activar manualmente el entorno virtual ni ejecutar las migraciones por separado.
+`uv sync` prepara el entorno `.venv` con las versiones registradas en `uv.lock`. No necesitas activar el entorno ni ejecutar las migraciones por separado.
 
 Para aplicar únicamente las migraciones:
 
@@ -67,24 +46,54 @@ Para aplicar únicamente las migraciones:
 uv run --frozen python -m src.core
 ```
 
-## Ejecución con Docker Compose
+## 3. Estructura del proyecto
 
-Requisito: Docker con Docker Compose disponible y el motor de Docker en ejecución. Los archivos de entrada también deben existir en `data/raw/`.
-
-Desde la raíz del repositorio:
-
-```bash
-docker compose build
-docker compose run --rm pipeline
+```text
+.
+├── main.py                  # Inicio del proceso
+├── config/
+│   └── settings.toml        # Rutas y archivos de entrada
+├── data/
+│   ├── raw/                 # Archivos Parquet originales
+│   └── output/              # Base de datos y reportes generados
+├── migrations/              # Cambios versionados del esquema de datos
+├── sql/                     # Consultas de carga, comparación y analítica
+├── src/
+│   ├── pipeline.py          # Coordinación del proceso completo
+│   ├── ingestion.py         # Carga y control de archivos procesados
+│   ├── consolidation.py     # Registro de cambios y actualización del resultado
+│   ├── analytics.py         # Generación de reportes y CSV
+│   └── core/
+│       ├── config.py        # Lectura y validación de la configuración
+│       ├── database.py      # Conexión a DuckDB
+│       ├── migrate.py       # Aplicación de migraciones
+│       └── __main__.py      # Ejecución independiente de migraciones
+├── INSIGHTS.md              # Hallazgos y recomendaciones
+├── Dockerfile
+├── docker-compose.yml
+├── pyproject.toml           # Dependencias y herramientas
+├── uv.lock                  # Versiones de las dependencias
+└── README.md
 ```
 
-La imagen incluye Python y `uv`, por lo que no necesitas instalarlos en el equipo para esta alternativa. El servicio monta `./data` en `/app/data`: lee los Parquet del equipo y guarda la base de datos en `data/output/tyba.duckdb`. El contenedor termina cuando finaliza el proceso.
+La solución utiliza **Python** para coordinar el proceso y **DuckDB** para leer Parquet, transformar datos y consolidar resultados mediante SQL. La configuración se define en **TOML**, se lee con `tomllib` y se valida con **Pydantic**. Las dependencias se administran con **uv**.
 
-Si modificas el código, las consultas SQL o la configuración, vuelve a construir la imagen antes de ejecutar.
+## 4. Cómo funciona
 
-## Configuración
+1. **Prepara la base de datos.** Aplica las migraciones pendientes y verifica que las ya ejecutadas conserven su contenido mediante SHA-256.
+2. **Carga los cortes vigentes.** Compara la huella de cada archivo con la de su tabla activa. Si cambió, reemplaza ese corte; si permanece igual, omite la carga.
+3. **Normaliza los datos.** Unifica fechas y tipos de movimiento, convierte los montos a `DECIMAL(20,4)` y conserva los valores originales de fecha y tipo.
+4. **Compara los movimientos.** Calcula una llave compuesta (`business_key`) para identificar correspondencias y una huella del contenido (`row_hash`) para detectar cambios.
+5. **Consolida el resultado.** Actualiza `movimientos_dia_final` con el contenido de T1 y registra las acciones de la comparación. La carga, los logs y la consolidación se confirman en una sola transacción.
+6. **Genera la analítica.** Exporta un reporte Markdown y siete CSV con métricas de volumen, calidad, montos y cambios entre cortes.
 
-Las rutas y los archivos de entrada se definen en `config/settings.toml`:
+La comparación distingue `INSERTAR`, `ACTUALIZAR`, `ELIMINAR` y `OMITIR` cuando la llave permite una correspondencia única. Si la llave se repite en cualquiera de los cortes, las filas involucradas se reportan como `AMBIGUO`. Las filas sin llave se reportan como `SIN_LLAVE`.
+
+Todos los registros de T1 se conservan en el resultado. Las llaves únicas se procesan con `MERGE`; las filas con llave repetida o nula se reemplazan como conjunto. Un cambio exclusivamente de formato, una vez normalizado, se considera equivalente.
+
+## 5. Configuración y datos de entrada
+
+Las rutas se definen en `config/settings.toml`:
 
 ```toml
 [database]
@@ -105,67 +114,94 @@ snapshots = [
 ]
 ```
 
-Las rutas relativas se resuelven desde el directorio de ejecución; por eso los comandos deben ejecutarse desde la raíz. La ubicación efectiva de la base de datos depende de `database.path`; cambiar solo `data.output_directory` no cambia esa ubicación.
+Los Parquet deben incluir `id_cliente`, `date`, `product`, `type`, `fund`, `amount`, `description` y `commercial_name`.
 
-Actualmente, el nombre de cada archivo determina su tabla de carga y las consultas SQL utilizan explícitamente `movimientos_dia_t` y `movimientos_dia_t1`. Cambiar los nombres de archivo o agregar otros conjuntos requiere adaptar también las tablas y las consultas; el campo `batch` no selecciona la tabla de destino.
+Ejecuta los comandos desde la raíz del repositorio para resolver correctamente las rutas relativas. `database.path` define dónde se guarda DuckDB y `data.output_directory` define la carpeta de los reportes.
 
-## Flujo de procesamiento
+Los nombres de archivo determinan las tablas de entrada. La solución espera exactamente un archivo `movimientos_dia_T.parquet` y uno `movimientos_dia_T1.parquet`; para admitir otros nombres o más cortes, también se deben ajustar la validación y las consultas SQL. El campo `batch` es descriptivo y no selecciona la tabla de destino.
 
-1. **Migraciones:** crea las tablas y registra las versiones aplicadas. Verifica su huella SHA-256 para detectar cambios en migraciones ya ejecutadas.
-2. **Carga:** calcula el SHA-256 de cada archivo y omite los archivos cuyo contenido ya está registrado. La carga de cada archivo se realiza dentro de una transacción.
-3. **Normalización:** convierte fechas, homologa tipos de movimiento y convierte montos a `DECIMAL(20,4)`. Conserva los valores originales de fecha y tipo en `raw_date` y `raw_type`.
-4. **Identificación:** calcula `business_key` a partir de la llave compuesta y `row_hash` a partir del contenido del movimiento.
-5. **Comparación:** registra en `pipeline_logs` las acciones `INSERTAR`, `ACTUALIZAR`, `ELIMINAR` y `OMITIR`, comparando `T` con `T1`.
-6. **Consolidación:** sincroniza `movimientos_dia_final` con `T1` mediante inserciones, actualizaciones y eliminaciones. El registro de acciones y la consolidación se ejecutan en una misma transacción.
+## 6. Resultados y analítica
 
-## Resultados y consultas
+### Base de datos
 
-La ejecución genera una base de datos en `data/output/tyba.duckdb`. Los resultados permanecen en DuckDB; el pipeline no exporta un archivo Parquet final.
-
-| Tabla | Contenido |
+| Tabla | Para qué sirve |
 | --- | --- |
-| `movimientos_dia_t` | Movimientos normalizados del archivo T. |
-| `movimientos_dia_t1` | Movimientos normalizados del archivo T1. |
-| `movimientos_dia_final` | Movimientos consolidados tomando T1 como referencia. |
-| `pipeline_logs` | Acciones identificadas al comparar T con T1. |
-| `tipos_movimientos` | Equivalencias para normalizar los tipos de movimiento. |
-| `idempotencia_archivo_movimientos` | Archivos cargados y sus huellas SHA-256. |
-| `migraciones` | Versiones aplicadas y sus huellas SHA-256. |
+| `movimientos_dia_t` | Consultar el primer corte normalizado. |
+| `movimientos_dia_t1` | Consultar el segundo corte normalizado. |
+| `movimientos_dia_final` | Consultar el estado consolidado de T1. |
+| `pipeline_logs` | Revisar las acciones identificadas en cada ejecución. |
+| `tipos_movimientos` | Consultar las equivalencias entre tipos originales y normalizados. |
+| `idempotencia_archivo_movimientos` | Identificar los archivos que se han cargado. |
+| `archivos_activos` | Saber qué archivo representa cada tabla de entrada. |
+| `pipeline_ejecuciones` | Consultar las huellas de los cortes y la fecha de cada consolidación. |
+| `migraciones` | Revisar los cambios de esquema aplicados. |
 
-Para consultar el resumen de acciones desde la terminal:
-
-```bash
-uv run --frozen python -c "import duckdb; con = duckdb.connect('data/output/tyba.duckdb', read_only=True); print(con.sql('SELECT accion, COUNT(*) AS total FROM pipeline_logs GROUP BY accion ORDER BY accion')); con.close()"
-```
-
-También puedes abrir la base de datos con un cliente compatible con DuckDB y ejecutar:
+Desde un cliente compatible con DuckDB puedes consultar:
 
 ```sql
+-- Acciones de la última ejecución
 SELECT accion, COUNT(*) AS total
 FROM pipeline_logs
+WHERE run_id = (SELECT MAX(run_id) FROM pipeline_ejecuciones)
 GROUP BY accion
 ORDER BY accion;
 
+-- Cantidad de movimientos consolidados
 SELECT COUNT(*) AS total_movimientos
 FROM movimientos_dia_final;
 
-SELECT *
-FROM movimientos_dia_final
-LIMIT 10;
+-- Muestra de los datos
+SELECT * FROM movimientos_dia_final LIMIT 10;
 ```
+
+### Reportes
+
+| Archivo en `data/output/` | Contenido |
+| --- | --- |
+| `insights.md` | Resumen de las métricas de los cortes vigentes. |
+| `analytics_resumen.csv` | Movimientos, clientes, calidad de datos y fechas por corte. |
+| `analytics_duplicados.csv` | Llaves repetidas y cantidad de filas involucradas. |
+| `analytics_flujos.csv` | Cantidades y montos disponibles por tipo de movimiento. |
+| `analytics_productos_fondos.csv` | Distribución por producto, fondo y tipo. |
+| `analytics_fechas.csv` | Distribución por fecha del movimiento y tipo. |
+| `analytics_acciones.csv` | Acciones de la última ejecución y filas involucradas. |
+| `analytics_validacion.csv` | Comparación del resultado con T1 y cobertura de la clasificación. |
+
+Para regenerar los reportes de una base ya procesada:
+
+```bash
+uv run --frozen python -m src.analytics
+```
+
+Con Docker, después de construir la imagen:
+
+```bash
+docker compose run --rm pipeline uv run python -m src.analytics
+```
+
+Las consultas están en `sql/analytics.sql`. Crean vistas temporales que puedes consultar en la misma conexión, por ejemplo: `SELECT * FROM analytics_resumen ORDER BY corte;`.
+
+Las sumas excluyen montos nulos y conservan los signos originales. Para interpretarlas se debe considerar la cobertura de datos y confirmar la moneda. Las categorías `AMBIGUO` y `SIN_LLAVE` cuentan las filas de cada corte por separado.
 
 ## Observaciones Calidad de datos
 
-1. **Ausencia del identificador de transacción.** En los archivos recibidos no existe el campo `ID` que permita identificar de forma única cada transacción. El campo `id_cliente` identifica al cliente, pero no a cada uno de sus movimientos. Los identificadores `row_id` generados en DuckDB son internos y no sustituyen un identificador de transacción de origen.
-2. **Normalización de fechas.** Se identifican fechas en los formatos `DD/MM/AAAA` y `AAAA-MM-DD`. Se decide unificar su representación como `AAAA-MM-DD`, almacenándolas como valores de tipo `DATE`. La implementación también admite `AAAA/MM/DD` y `DD-MM-AAAA`. Las fechas vacías, inválidas o no reconocidas quedan como `NULL`, y el valor original se conserva en `raw_date`.
-3. **Normalización del tipo de movimiento.** Se decide utilizar únicamente los valores `ENTRADA` y `SALIDA`. Las equivalencias incluyen `IN` → `ENTRADA` y `OUT` → `SALIDA`; antes de buscar la equivalencia se eliminan espacios en los extremos y acentos, y se convierte el texto a mayúsculas. Los valores no reconocidos quedan como `NULL`, conservando el dato original en `raw_type`.
-4. **Llave compuesta para comparar movimientos.** Al no disponer de un identificador único de transacción, no es posible garantizar la correspondencia individual de todos los movimientos entre archivos. Para avanzar con la prueba, se adopta la llave compuesta `(id_cliente, date, product, type, fund, commercial_name)`, representada mediante un hash SHA-256 en `business_key`. Esta decisión permite comparar movimientos bajo ese supuesto, pero dos transacciones distintas con los mismos valores compartirán la llave. Además, modificar cualquiera de esos campos puede interpretarse como una eliminación y una inserción, en lugar de una actualización. La definición está centralizada en `sql/movimientos_insertar.sql`, en el cálculo de `business_key`, para facilitar su ajuste si se dispone de un mejor criterio de identificación.
+1. **Identificador de transacción ausente.** Los archivos recibidos no incluyen el campo `ID` mencionado en el enunciado. `id_cliente` identifica al cliente, pero no permite distinguir cada uno de sus movimientos. Los `row_id` generados por DuckDB son identificadores internos.
+2. **Fechas con formatos diferentes.** Se identificaron fechas en `DD/MM/AAAA` y `AAAA-MM-DD`. Elegí unificar su representación como `AAAA-MM-DD` y almacenarlas como `DATE`. La implementación también admite `AAAA/MM/DD` y `DD-MM-AAAA`. Los valores vacíos o inválidos quedan como `NULL`; el dato original se conserva en `raw_date`.
+3. **Tipos de movimiento sin un formato uniforme.** Normalicé el campo `type` a `ENTRADA` y `SALIDA`, incluyendo las equivalencias `IN` y `OUT`. Antes de buscar la equivalencia se eliminan espacios en los extremos y acentos, y se convierte el texto a mayúsculas. Los valores no reconocidos quedan como `NULL`, con el original disponible en `raw_type`.
+4. **Llave compuesta como criterio de comparación.** Para avanzar sin un identificador de transacción, utilicé `(id_cliente, date, product, type, fund, commercial_name)`. Su representación SHA-256 se guarda en `business_key`. Esta decisión permite comparar los cortes, aunque movimientos distintos pueden compartir la misma llave. Además, cambiar uno de sus componentes puede interpretarse como una eliminación y una inserción. La definición está centralizada en `sql/movimientos_insertar.sql` para facilitar su ajuste cuando se disponga de un mejor criterio.
 
-Adicionalmente, los montos que no pueden convertirse a `DECIMAL(20,4)` quedan como `NULL`. Si falta un `id_cliente` válido, una fecha válida o un tipo reconocido, no se genera `business_key`. Estos registros no se descartan automáticamente ni se separan en una tabla de rechazos, por lo que deben considerarse al interpretar la comparación.
+Los hashes se calculan sobre los campos ya normalizados. Los montos que no pueden convertirse a `DECIMAL(20,4)` quedan como `NULL`. Si falta un cliente válido, una fecha válida o un tipo reconocido, no se genera la llave: la fila se conserva y se reporta como `SIN_LLAVE`. Las llaves repetidas se reportan como `AMBIGUO`.
 
-## Reejecución y alcance
+Cubren los cambios entre cortes, reejecuciones, modificaciones de un solo archivo, restauración de cortes anteriores, llaves repetidas o nulas, cambios de formato, cortes vacíos y recuperación ante fallas.
 
-- Si vuelves a ejecutar los mismos archivos, su SHA-256 permite omitir la carga y el pipeline informa que ya estaban cargados.
-- En la implementación actual, basta con que **uno** de los archivos sea omitido para que no se ejecute la comparación ni la consolidación. Las tablas de entrada, además, acumulan cargas de archivos con contenido nuevo. El flujo está orientado a procesar la pareja de archivos de esta prueba sobre una base nueva.
-- Para repetir la prueba desde cero sin perder resultados anteriores, configura otra ruta de base de datos en `database.path` y ejecuta nuevamente. Si usas Docker, reconstruye la imagen para incorporar el cambio de configuración.
-- Para evolucionar el esquema, agrega una nueva migración con el patrón `vNNNN_descripcion.sql`, una versión única y numeración con ceros a la izquierda. Evita editar migraciones ya aplicadas: la verificación SHA-256 detectará la modificación y detendrá la ejecución.
+## 7. Reejecución, trazabilidad y alcance
+
+- **Mismos archivos:** se omiten la carga y la consolidación, sin duplicar movimientos ni logs. Los reportes se regeneran.
+- **Un archivo cambia:** se reemplaza su tabla y se compara la pareja vigente. Una falla antes de confirmar la transacción revierte también las cargas y sus registros de control.
+- **Trazabilidad:** cada consolidación guarda las huellas de ambos archivos. Los logs conservan la ejecución, la acción y los identificadores internos de las filas comparadas. Los logs anteriores a la migración de trazabilidad tienen `run_id` nulo y se excluyen del reporte de la última ejecución.
+- **Historial:** las tablas de entrada y los CSV muestran los cortes vigentes. Para conservar el contenido completo de cortes anteriores se necesita una política adicional de almacenamiento histórico.
+- **Escala:** el trabajo sobre los movimientos se ejecuta en DuckDB mediante SQL, sin cargar todas las filas en listas de Python. La comparación recorre los cortes completos y asume un único proceso escritor. Queda pendiente medir el rendimiento con millones de filas.
+
+Para repetir la prueba en una base nueva y conservar los resultados anteriores, cambia `database.path`. Si usas Docker, reconstruye la imagen después del cambio.
+
+Para modificar el esquema, agrega una migración con el patrón `vNNNN_descripcion.sql`, una versión única y ceros a la izquierda. Las migraciones ya aplicadas se verifican mediante SHA-256; editarlas detendrá la ejecución.
