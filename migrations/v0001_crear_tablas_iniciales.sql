@@ -4,7 +4,7 @@ CREATE SEQUENCE IF NOT EXISTS seq_movimientos_dia_t START 1;
 -- Crear tabla movimientos_dia_t
 CREATE TABLE IF NOT EXISTS movimientos_dia_t
 (
-    row_id INTEGER PRIMARY KEY DEFAULT NEXTVAL('seq_movimientos_dia_t'),
+    row_id BIGINT PRIMARY KEY DEFAULT NEXTVAL('seq_movimientos_dia_t'),
     id_cliente VARCHAR,
     date DATE,
     raw_date VARCHAR,
@@ -33,7 +33,7 @@ CREATE SEQUENCE IF NOT EXISTS seq_movimientos_dia_t1 START 1;
 -- Crear tabla movimientos_dia_t1
 CREATE TABLE IF NOT EXISTS movimientos_dia_t1
 (
-    row_id INTEGER PRIMARY KEY DEFAULT NEXTVAL('seq_movimientos_dia_t1'),
+    row_id BIGINT PRIMARY KEY DEFAULT NEXTVAL('seq_movimientos_dia_t1'),
     id_cliente VARCHAR,
     date DATE,
     raw_date VARCHAR,
@@ -83,7 +83,8 @@ CREATE SEQUENCE IF NOT EXISTS seq_movimientos_dia_final START 1;
 -- Crear tabla movimientos_dia_t
 CREATE TABLE IF NOT EXISTS movimientos_dia_final
 (
-    row_id INTEGER PRIMARY KEY DEFAULT NEXTVAL('seq_movimientos_dia_final'),
+    row_id BIGINT PRIMARY KEY DEFAULT NEXTVAL('seq_movimientos_dia_final'),
+    row_id_t1 BIGINT,
     id_cliente VARCHAR,
     date DATE,
     raw_date VARCHAR,
@@ -99,6 +100,7 @@ CREATE TABLE IF NOT EXISTS movimientos_dia_final
 );
 
 --Crear indices para la tabla movimientos_dia_final
+CREATE INDEX IF NOT EXISTS idx_movimientos_dia_final_row_id_t1 ON movimientos_dia_final(row_id_t1);
 CREATE INDEX IF NOT EXISTS idx_movimientos_dia_final_id_cliente ON movimientos_dia_final(id_cliente);
 CREATE INDEX IF NOT EXISTS idx_movimientos_dia_final_product ON movimientos_dia_final(product);
 CREATE INDEX IF NOT EXISTS idx_movimientos_dia_final_type ON movimientos_dia_final(type);
