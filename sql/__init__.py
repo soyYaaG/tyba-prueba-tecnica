@@ -4,6 +4,7 @@ from pathlib import Path
 __all__ = ['get_sql']
 
 _SQL_FILES = {
+    'analytics': 'analytics.sql',
     'migracion_crear_tabla': 'migracion_crear_tabla.sql',
     'migracion_insertar': 'migracion_insertar.sql',
     'migracion_seleccionar_huella_sha256': 'migracion_seleccionar_huella_sha256.sql',
